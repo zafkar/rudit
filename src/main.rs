@@ -1,18 +1,17 @@
-use std::{
-    collections::VecDeque,
-    fs,
-    io::{stdout, Write},
-};
-
 use anyhow::Result;
+use buffer::Buffer;
 use crossterm::{
     cursor,
     event::{self, KeyEventKind},
     execute, queue,
     style::{self},
-    terminal, Command,
+    terminal,
 };
-use itertools::Itertools;
+use pos::Pos;
+use std::io::{stdout, Write};
+
+mod buffer;
+mod pos;
 
 fn main() -> Result<()> {
     let mut stdout = stdout();
@@ -54,13 +53,13 @@ fn main() -> Result<()> {
                         event::KeyCode::Up => {
                             buffer.move_up();
                             let new_pos = buffer.get_viewport_pos(scroll);
-                            scroll = cap_scroll(scroll, buffer.cursor, width, height);
+                            scroll = cap_scroll(scroll, buffer.get_cursor(), width, height);
                             queue!(stdout, cursor::MoveTo(new_pos.x as u16, new_pos.y as u16))?;
                         }
                         event::KeyCode::Down => {
                             buffer.move_down();
                             let new_pos = buffer.get_viewport_pos(scroll);
-                            scroll = cap_scroll(scroll, buffer.cursor, width, height);
+                            scroll = cap_scroll(scroll, buffer.get_cursor(), width, height);
                             queue!(stdout, cursor::MoveTo(new_pos.x as u16, new_pos.y as u16))?;
                         }
                         _ => (),
@@ -131,92 +130,4 @@ fn cap_scroll(current_scroll: Pos, buffer_cursor: Pos, width: u16, height: u16) 
         current_scroll.y
     };
     Pos::new(x, y)
-}
-
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
-struct Pos {
-    x: usize,
-    y: usize,
-}
-
-impl Pos {
-    fn new(x: usize, y: usize) -> Pos {
-        Pos { x, y }
-    }
-}
-
-#[derive(Debug, Clone, Default)]
-struct Buffer {
-    data: Vec<String>,
-    cursor: Pos,
-}
-
-impl Buffer {
-    fn new() -> Buffer {
-        Buffer {
-            data: vec!["First line".to_string()],
-            cursor: Pos::default(),
-        }
-    }
-
-    fn get_viewport_pos(&self, scroll: Pos) -> Pos {
-        Pos::new(
-            self.cursor.x.checked_sub(scroll.x).unwrap_or_default(),
-            self.cursor.y.checked_sub(scroll.y).unwrap_or_default(),
-        )
-    }
-
-    fn get_viewport(
-        &self,
-        origin_x: usize,
-        origin_y: usize,
-        width: usize,
-        height: usize,
-    ) -> Vec<String> {
-        let mut viewport = vec![];
-        for y in origin_y..origin_y + height {
-            if let Some(line) = self.data.get(y) {
-                viewport.push(line.to_string());
-            }
-        }
-        viewport
-    }
-
-    fn move_up(&mut self) -> Pos {
-        self.move_cursor(
-            self.cursor.x,
-            self.cursor.y.checked_sub(1).unwrap_or(self.cursor.y),
-        )
-    }
-
-    fn move_down(&mut self) -> Pos {
-        self.move_cursor(self.cursor.x, self.cursor.y + 1)
-    }
-
-    fn move_left(&mut self) -> Pos {
-        self.move_cursor(
-            self.cursor.x.checked_sub(1).unwrap_or(self.cursor.x),
-            self.cursor.y,
-        )
-    }
-
-    fn move_right(&mut self) -> Pos {
-        self.move_cursor(self.cursor.x + 1, self.cursor.y)
-    }
-
-    fn move_cursor(&mut self, x: usize, y: usize) -> Pos {
-        let y = self.data.len().min(y);
-        let x = self.data.get(y).map(|l| l.len()).unwrap_or_default().min(x);
-        self.cursor = Pos::new(x, y);
-        self.cursor.clone()
-    }
-
-    fn load_from_file(path: &str) -> Result<Buffer> {
-        let mut loaded_buffer = Buffer::new();
-        loaded_buffer.data = fs::read_to_string(path)?
-            .lines()
-            .map(|l| l.to_string())
-            .collect_vec();
-        Ok(loaded_buffer)
-    }
 }
