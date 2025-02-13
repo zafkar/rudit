@@ -1,9 +1,12 @@
-use std::io::{Stdout, Write};
+use std::{
+    io::{Stdout, Write},
+    path::{Path, PathBuf},
+};
 
 use anyhow::Result;
 use crossterm::{
     cursor,
-    event::{self, Event, KeyEventKind},
+    event::{self, Event, KeyEventKind, KeyModifiers},
     queue, style, terminal,
 };
 
@@ -17,6 +20,7 @@ pub struct Editor {
     buffer: Buffer,
     state: EditorState,
     config: Config,
+    filename: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -35,6 +39,7 @@ impl Editor {
             buffer: Buffer::new(),
             state: EditorState::Init,
             config: Config::default(),
+            filename: None,
         }
     }
 
@@ -42,9 +47,17 @@ impl Editor {
         self.state == EditorState::Close
     }
 
-    pub fn set_buffer(mut self, buffer: Buffer) -> Editor {
-        self.buffer = buffer;
-        self
+    pub fn set_document<P>(&mut self, path: P) -> Result<()>
+    where
+        P: AsRef<Path> + Clone,
+        PathBuf: From<P>,
+    {
+        self.buffer = match Buffer::load_from_file(path.clone()) {
+            Ok(buffer) => buffer,
+            Err(_) => Buffer::new(),
+        };
+        self.filename = Some(path.into());
+        Ok(())
     }
 
     pub fn set_size(&mut self, width: u16, height: u16) {
@@ -93,53 +106,64 @@ impl Editor {
         match event {
             event::Event::Key(key_event) => {
                 if key_event.kind == KeyEventKind::Press {
-                    match key_event.code {
-                        event::KeyCode::Esc => self.state = EditorState::Close,
-                        event::KeyCode::Up => {
-                            self.buffer.move_up();
-                            self.cap_scroll();
-                        }
-                        event::KeyCode::Down => {
-                            self.buffer.move_down();
-                            self.cap_scroll();
-                        }
-                        event::KeyCode::Right => {
-                            self.buffer.move_right();
-                            self.cap_scroll();
-                        }
-                        event::KeyCode::Left => {
-                            self.buffer.move_left();
-                            self.cap_scroll();
-                        }
-                        event::KeyCode::PageUp => {
-                            self.buffer.move_cursor(
-                                self.buffer.get_cursor().x,
+                    match key_event.modifiers {
+                        KeyModifiers::NONE => match key_event.code {
+                            event::KeyCode::Esc => self.state = EditorState::Close,
+                            event::KeyCode::Up => {
+                                self.buffer.move_up();
+                                self.cap_scroll();
+                            }
+                            event::KeyCode::Down => {
+                                self.buffer.move_down();
+                                self.cap_scroll();
+                            }
+                            event::KeyCode::Right => {
+                                self.buffer.move_right();
+                                self.cap_scroll();
+                            }
+                            event::KeyCode::Left => {
+                                self.buffer.move_left();
+                                self.cap_scroll();
+                            }
+                            event::KeyCode::PageUp => {
+                                self.buffer.move_cursor(
+                                    self.buffer.get_cursor().x,
+                                    self.buffer
+                                        .get_cursor()
+                                        .y
+                                        .checked_sub(self.viewport_size.y - 1)
+                                        .unwrap_or_default(),
+                                );
+                                self.cap_scroll();
+                            }
+                            event::KeyCode::PageDown => {
+                                self.buffer.move_cursor(
+                                    self.buffer.get_cursor().x,
+                                    self.buffer.get_cursor().y + self.viewport_size.y - 1,
+                                );
+                                self.cap_scroll();
+                            }
+                            event::KeyCode::Enter => {
+                                self.buffer.add_line_at_cursor()?;
+                                self.cap_scroll();
+                            }
+                            event::KeyCode::Char(c) => {
+                                self.buffer.add_str_at_cursor(format!("{}", c).as_str())?;
+                            }
+                            keycode => {
                                 self.buffer
-                                    .get_cursor()
-                                    .y
-                                    .checked_sub(self.viewport_size.y - 1)
-                                    .unwrap_or_default(),
-                            );
-                            self.cap_scroll();
-                        }
-                        event::KeyCode::PageDown => {
-                            self.buffer.move_cursor(
-                                self.buffer.get_cursor().x,
-                                self.buffer.get_cursor().y + self.viewport_size.y - 1,
-                            );
-                            self.cap_scroll();
-                        }
-                        event::KeyCode::Enter => {
-                            self.buffer.add_line_at_cursor()?;
-                            self.cap_scroll();
-                        }
-                        event::KeyCode::Char(c) => {
-                            self.buffer.add_str_at_cursor(format!("{}", c).as_str())?;
-                        }
-                        keycode => {
-                            self.buffer
-                                .add_str_at_cursor(format!("{}", keycode).as_str())?;
-                        }
+                                    .add_str_at_cursor(format!("{}", keycode).as_str())?;
+                            }
+                        },
+                        KeyModifiers::CONTROL => match key_event.code {
+                            event::KeyCode::Char('s') => {
+                                if let Some(path) = self.filename.clone() {
+                                    self.buffer.save_to_file(path)?;
+                                }
+                            }
+                            _ => (),
+                        },
+                        _ => (),
                     }
                 }
             }

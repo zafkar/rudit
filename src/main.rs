@@ -1,5 +1,4 @@
 use anyhow::Result;
-use buffer::Buffer;
 use clap::{arg, command};
 use crossterm::{
     event::{self},
@@ -8,7 +7,7 @@ use crossterm::{
     terminal,
 };
 use editor::Editor;
-use std::io::stdout;
+use std::{io::stdout, path::PathBuf};
 
 mod buffer;
 mod config;
@@ -25,7 +24,7 @@ fn main() -> Result<()> {
 
     let mut editor = Editor::new();
     if let Some(path) = matches.get_one::<String>("FILE") {
-        editor = editor.set_buffer(Buffer::load_from_file(path)?);
+        editor.set_document(path)?;
     }
 
     {

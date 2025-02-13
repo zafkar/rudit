@@ -1,4 +1,4 @@
-use std::fs;
+use std::{fs, path::Path};
 
 use anyhow::{Context, Result};
 use itertools::Itertools;
@@ -9,6 +9,7 @@ use crate::pos::Pos;
 pub struct Buffer {
     data: Vec<String>,
     cursor: Pos,
+    endl: String,
 }
 
 impl Buffer {
@@ -16,6 +17,7 @@ impl Buffer {
         Buffer {
             data: vec![],
             cursor: Pos::default(),
+            endl: String::from("\n"),
         }
     }
 
@@ -101,12 +103,30 @@ impl Buffer {
         Ok(())
     }
 
-    pub fn load_from_file(path: &str) -> Result<Buffer> {
+    pub fn load_from_file<P>(path: P) -> Result<Buffer>
+    where
+        P: AsRef<Path>,
+    {
         let mut loaded_buffer = Buffer::new();
         loaded_buffer.data = fs::read_to_string(path)?
             .lines()
             .map(|l| l.to_string())
             .collect_vec();
         Ok(loaded_buffer)
+    }
+
+    pub fn save_to_file<P>(&self, path: P) -> Result<()>
+    where
+        P: AsRef<Path>,
+    {
+        fs::write(
+            path,
+            self.data
+                .iter()
+                .map(|line| (line.to_string() + &self.endl))
+                .join("")
+                .as_bytes(),
+        )?;
+        Ok(())
     }
 }
