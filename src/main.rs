@@ -7,7 +7,7 @@ use crossterm::{
     terminal,
 };
 use editor::Editor;
-use std::{io::stdout, path::PathBuf};
+use std::io::stdout;
 
 mod buffer;
 mod config;

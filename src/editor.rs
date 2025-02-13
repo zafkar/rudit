@@ -21,6 +21,7 @@ pub struct Editor {
     state: EditorState,
     config: Config,
     filename: Option<PathBuf>,
+    last_keypress: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -40,6 +41,7 @@ impl Editor {
             state: EditorState::Init,
             config: Config::default(),
             filename: None,
+            last_keypress: String::new(),
         }
     }
 
@@ -106,26 +108,27 @@ impl Editor {
         match event {
             event::Event::Key(key_event) => {
                 if key_event.kind == KeyEventKind::Press {
-                    match key_event.modifiers {
-                        KeyModifiers::NONE => match key_event.code {
-                            event::KeyCode::Esc => self.state = EditorState::Close,
-                            event::KeyCode::Up => {
+                    self.last_keypress = format!("{}{}", key_event.modifiers, key_event.code);
+                    match self.config.keybindings.get(&self.last_keypress) {
+                        Some(action) => match action {
+                            EditorAction::Quit => self.state = EditorState::Close,
+                            EditorAction::MoveUp => {
                                 self.buffer.move_up();
                                 self.cap_scroll();
                             }
-                            event::KeyCode::Down => {
+                            EditorAction::MoveDown => {
                                 self.buffer.move_down();
                                 self.cap_scroll();
                             }
-                            event::KeyCode::Right => {
+                            EditorAction::MoveRight => {
                                 self.buffer.move_right();
                                 self.cap_scroll();
                             }
-                            event::KeyCode::Left => {
+                            EditorAction::MoveLeft => {
                                 self.buffer.move_left();
                                 self.cap_scroll();
                             }
-                            event::KeyCode::PageUp => {
+                            EditorAction::PageUp => {
                                 self.buffer.move_cursor(
                                     self.buffer.get_cursor().x,
                                     self.buffer
@@ -136,13 +139,20 @@ impl Editor {
                                 );
                                 self.cap_scroll();
                             }
-                            event::KeyCode::PageDown => {
+                            EditorAction::PageDown => {
                                 self.buffer.move_cursor(
                                     self.buffer.get_cursor().x,
                                     self.buffer.get_cursor().y + self.viewport_size.y - 1,
                                 );
                                 self.cap_scroll();
                             }
+                            EditorAction::SaveDocument => {
+                                if let Some(path) = self.filename.clone() {
+                                    self.buffer.save_to_file(path)?;
+                                }
+                            }
+                        },
+                        None => match key_event.code {
                             event::KeyCode::Enter => {
                                 self.buffer.add_line_at_cursor()?;
                                 self.cap_scroll();
@@ -155,15 +165,6 @@ impl Editor {
                                     .add_str_at_cursor(format!("{}", keycode).as_str())?;
                             }
                         },
-                        KeyModifiers::CONTROL => match key_event.code {
-                            event::KeyCode::Char('s') => {
-                                if let Some(path) = self.filename.clone() {
-                                    self.buffer.save_to_file(path)?;
-                                }
-                            }
-                            _ => (),
-                        },
-                        _ => (),
                     }
                 }
             }
@@ -233,9 +234,10 @@ impl Editor {
             style::SetBackgroundColor(self.config.bg_color_ui),
             terminal::Clear(terminal::ClearType::CurrentLine),
             style::Print(format!(
-                "Cursor : {}, Scroll : {}",
+                "Cursor : {}, Scroll : {}, Last Key Press : ({})",
                 self.buffer.get_cursor(),
-                self.scroll
+                self.scroll,
+                self.last_keypress
             )),
         )?;
 
@@ -244,4 +246,16 @@ impl Editor {
         stdout.flush()?;
         Ok(())
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EditorAction {
+    Quit,
+    MoveUp,
+    MoveDown,
+    MoveRight,
+    MoveLeft,
+    PageUp,
+    PageDown,
+    SaveDocument,
 }
