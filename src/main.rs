@@ -3,8 +3,6 @@ use clap::{arg, command, Command};
 use config::Config;
 use crossterm::{
     event::{self},
-    execute,
-    style::{self},
     terminal,
 };
 use editor::Editor;
@@ -55,7 +53,8 @@ fn main() -> Result<()> {
                 editor.display(&mut stdout)?;
             }
 
-            execute!(stdout, style::ResetColor)?;
+            Editor::cleanup(&mut stdout)?;
+            terminal::disable_raw_mode()?;
         }
         _ => bail!("Unknown subcommand"),
     }

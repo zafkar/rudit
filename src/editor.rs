@@ -101,6 +101,20 @@ impl Editor {
         self.scroll = Pos::new(x, y);
     }
 
+    pub fn cleanup(stdout: &mut Stdout) -> Result<()> {
+        queue!(
+            stdout,
+            event::DisableBracketedPaste,
+            event::DisableFocusChange,
+            event::DisableMouseCapture,
+            style::ResetColor,
+        )?;
+
+        stdout.flush()?;
+
+        Ok(())
+    }
+
     fn init(&mut self, stdout: &mut Stdout) -> Result<()> {
         if self.config.use_mouse {
             queue!(stdout, event::EnableMouseCapture,)?;
