@@ -118,6 +118,28 @@ impl Editor {
             event::Event::Resize(width, height) => {
                 self.set_size(width, height);
             }
+            event::Event::Mouse(mouse_event) => match mouse_event.kind {
+                event::MouseEventKind::ScrollDown => {
+                    self.buffer.move_down();
+                    self.cap_scroll();
+                }
+                event::MouseEventKind::ScrollUp => {
+                    self.buffer.move_up();
+                    self.cap_scroll();
+                }
+                event::MouseEventKind::Down(button) => match button {
+                    event::MouseButton::Left => {
+                        self.buffer.move_cursor(
+                            mouse_event.column as usize + self.scroll.x,
+                            mouse_event.row as usize + self.scroll.y,
+                        );
+                        self.cap_scroll();
+                    }
+                    event::MouseButton::Right => todo!(),
+                    event::MouseButton::Middle => todo!(),
+                },
+                _ => (),
+            },
             _ => (),
         };
     }
@@ -132,7 +154,6 @@ impl Editor {
             stdout,
             cursor::MoveTo(viewport_pos.x as u16, viewport_pos.y as u16),
             cursor::SavePosition,
-            terminal::Clear(terminal::ClearType::All)
         )?;
 
         for (index, line) in self
@@ -144,6 +165,7 @@ impl Editor {
             queue!(
                 stdout,
                 cursor::MoveTo(0, index as u16),
+                terminal::Clear(terminal::ClearType::CurrentLine),
                 style::Print(format!("{line}"))
             )?;
         }
