@@ -17,6 +17,8 @@ pub struct Config {
     #[serde(serialize_with = "serialize_color_to_str")]
     pub fg_color_ui: Color,
     pub keybindings: HashMap<String, EditorAction>,
+    pub use_mouse: bool,
+    pub use_paste: bool,
 }
 
 fn deserialize_color_from_str<'de, D>(deserializer: D) -> Result<Color, D::Error>

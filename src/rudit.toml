@@ -3,6 +3,8 @@ fg_color_buffer = "#fbf1c7"
 bg_color_ui = "#804761"
 fg_color_ui = "#fbf1c7"
 
+use_mouse = true
+use_paste = false
 
 [keybindings]
 "Esc" = "Quit"

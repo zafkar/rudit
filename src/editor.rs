@@ -102,11 +102,15 @@ impl Editor {
     }
 
     fn init(&mut self, stdout: &mut Stdout) -> Result<()> {
+        if self.config.use_mouse {
+            queue!(stdout, event::EnableMouseCapture,)?;
+        }
+
+        if self.config.use_paste {
+            queue!(stdout, event::EnableBracketedPaste,)?;
+        }
         queue!(
             stdout,
-            event::EnableBracketedPaste,
-            event::EnableFocusChange,
-            event::EnableMouseCapture,
             style::SetForegroundColor(self.config.fg_color_ui.into()),
             style::SetBackgroundColor(self.config.bg_color_ui.into()),
             terminal::Clear(terminal::ClearType::All),
