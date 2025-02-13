@@ -10,6 +10,7 @@ use editor::Editor;
 use std::io::stdout;
 
 mod buffer;
+mod config;
 mod editor;
 mod pos;
 

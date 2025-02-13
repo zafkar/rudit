@@ -7,14 +7,16 @@ use crossterm::{
     queue, style, terminal,
 };
 
-use crate::{buffer::Buffer, pos::Pos};
+use crate::{buffer::Buffer, config::Config, pos::Pos};
 
 #[derive(Debug, Clone)]
 pub struct Editor {
     scroll: Pos,
-    size: Pos,
+    window_size: Pos,
+    viewport_size: Pos,
     buffer: Buffer,
     state: EditorState,
+    config: Config,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -28,9 +30,11 @@ impl Editor {
     pub fn new() -> Editor {
         Editor {
             scroll: Pos::default(),
-            size: Pos::default(),
+            window_size: Pos::default(),
+            viewport_size: Pos::default(),
             buffer: Buffer::default(),
             state: EditorState::Init,
+            config: Config::default(),
         }
     }
 
@@ -44,22 +48,24 @@ impl Editor {
     }
 
     pub fn set_size(&mut self, width: u16, height: u16) {
-        self.size.x = width as usize;
-        self.size.y = height as usize;
+        self.window_size.x = width as usize;
+        self.window_size.y = height as usize;
+        self.viewport_size.x = width as usize;
+        self.viewport_size.y = height as usize - 1;
     }
 
     fn cap_scroll(&mut self) {
         let x = if self.buffer.get_cursor().x < self.scroll.x {
             self.buffer.get_cursor().x
-        } else if self.buffer.get_cursor().x > (self.scroll.x + self.size.x) {
-            self.scroll.x + (self.scroll.x + self.size.x - self.buffer.get_cursor().x)
+        } else if self.buffer.get_cursor().x > (self.scroll.x + self.viewport_size.x - 1) {
+            self.buffer.get_cursor().x - self.viewport_size.x + 1
         } else {
             self.scroll.x
         };
         let y = if self.buffer.get_cursor().y < self.scroll.y {
             self.buffer.get_cursor().y
-        } else if self.buffer.get_cursor().y > (self.scroll.y + self.size.y) {
-            self.buffer.get_cursor().y - self.size.y
+        } else if self.buffer.get_cursor().y > (self.scroll.y + self.viewport_size.y - 1) {
+            self.buffer.get_cursor().y - self.viewport_size.y + 1
         } else {
             self.scroll.y
         };
@@ -75,16 +81,8 @@ impl Editor {
             terminal::Clear(terminal::ClearType::All),
             cursor::EnableBlinking,
             cursor::MoveTo(0, 0),
-            style::SetForegroundColor(style::Color::Rgb {
-                r: 0x00,
-                g: 0xd9,
-                b: 0x07
-            }),
-            style::SetBackgroundColor(style::Color::Rgb {
-                r: 0xb1,
-                g: 0x62,
-                b: 0x86
-            }),
+            style::SetForegroundColor(self.config.fg_color_buffer),
+            style::SetBackgroundColor(self.config.bg_color_buffer),
         )?;
 
         self.state = EditorState::Normal;
@@ -139,7 +137,7 @@ impl Editor {
 
         for (index, line) in self
             .buffer
-            .get_viewport(self.scroll, self.size)
+            .get_viewport(self.scroll, self.viewport_size)
             .iter()
             .enumerate()
         {
@@ -152,11 +150,17 @@ impl Editor {
 
         queue!(
             stdout,
-            cursor::MoveTo(0, self.size.y as u16 - 1),
+            cursor::MoveTo(0, self.window_size.y as u16 - 1),
+            style::SetForegroundColor(self.config.fg_color_ui),
+            style::SetBackgroundColor(self.config.bg_color_ui),
             terminal::Clear(terminal::ClearType::CurrentLine),
-            style::SetAttribute(style::Attribute::Dim),
-            style::Print(format!("{:?}", self.scroll)),
-            style::SetAttribute(style::Attribute::NormalIntensity)
+            style::Print(format!(
+                "Cursor : {}, Scroll : {}",
+                self.buffer.get_cursor(),
+                self.scroll
+            )),
+            style::SetForegroundColor(self.config.fg_color_buffer),
+            style::SetBackgroundColor(self.config.bg_color_buffer),
         )?;
 
         queue!(stdout, cursor::RestorePosition)?;
