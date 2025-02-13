@@ -1,4 +1,5 @@
 use std::{
+    fs,
     io::{Stdout, Write},
     path::{Path, PathBuf},
 };
@@ -6,9 +7,11 @@ use std::{
 use anyhow::Result;
 use crossterm::{
     cursor,
-    event::{self, Event, KeyEventKind, KeyModifiers},
+    event::{self, Event, KeyEventKind},
     queue, style, terminal,
 };
+use serde::{Deserialize, Serialize};
+use strum::EnumString;
 
 use crate::{buffer::Buffer, config::Config, pos::Pos};
 
@@ -47,6 +50,15 @@ impl Editor {
 
     pub fn is_done(&self) -> bool {
         self.state == EditorState::Close
+    }
+
+    pub fn set_config<P>(&mut self, path: P) -> Result<()>
+    where
+        P: AsRef<Path>,
+    {
+        let file_content = fs::read_to_string(path)?;
+        self.config = toml::from_str(&file_content)?;
+        Ok(())
     }
 
     pub fn set_document<P>(&mut self, path: P) -> Result<()>
@@ -96,8 +108,8 @@ impl Editor {
             terminal::Clear(terminal::ClearType::All),
             cursor::EnableBlinking,
             cursor::MoveTo(0, 0),
-            style::SetForegroundColor(self.config.fg_color_buffer),
-            style::SetBackgroundColor(self.config.bg_color_buffer),
+            style::SetForegroundColor(self.config.fg_color_buffer.into()),
+            style::SetBackgroundColor(self.config.bg_color_buffer.into()),
         )?;
 
         self.state = EditorState::Normal;
@@ -208,8 +220,8 @@ impl Editor {
             stdout,
             cursor::MoveTo(viewport_pos.x as u16, viewport_pos.y as u16),
             cursor::SavePosition,
-            style::SetForegroundColor(self.config.fg_color_buffer),
-            style::SetBackgroundColor(self.config.bg_color_buffer),
+            style::SetForegroundColor(self.config.fg_color_buffer.into()),
+            style::SetBackgroundColor(self.config.bg_color_buffer.into()),
         )?;
 
         for (index, line) in self
@@ -230,8 +242,8 @@ impl Editor {
         queue!(
             stdout,
             cursor::MoveTo(0, self.window_size.y as u16 - 1),
-            style::SetForegroundColor(self.config.fg_color_ui),
-            style::SetBackgroundColor(self.config.bg_color_ui),
+            style::SetForegroundColor(self.config.fg_color_ui.into()),
+            style::SetBackgroundColor(self.config.bg_color_ui.into()),
             terminal::Clear(terminal::ClearType::CurrentLine),
             style::Print(format!(
                 "Cursor : {}, Scroll : {}, Last Key Press : ({})",
@@ -248,7 +260,7 @@ impl Editor {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumString, Deserialize, Serialize)]
 pub enum EditorAction {
     Quit,
     MoveUp,

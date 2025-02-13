@@ -1,0 +1,15 @@
+bg_color_buffer = "#b16286"
+fg_color_buffer = "#fbf1c7"
+bg_color_ui = "#804761"
+fg_color_ui = "#fbf1c7"
+
+
+[keybindings]
+"Esc" = "Quit"
+"Up" = "MoveUp"
+"Down" = "MoveDown"
+"Left" = "MoveLeft"
+"Right" = "MoveRight"
+"Page Down" = "PageDown"
+"Page Up" = "PageUp"
+"Ctrls" = "SaveDocument"
