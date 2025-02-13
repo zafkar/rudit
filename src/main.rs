@@ -26,7 +26,7 @@ fn main() -> Result<()> {
     }
 
     while !editor.is_done() {
-        editor.process_event(event::read()?);
+        editor.process_event(event::read()?)?;
         editor.display(&mut stdout)?;
     }
 

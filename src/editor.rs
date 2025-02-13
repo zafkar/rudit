@@ -89,7 +89,7 @@ impl Editor {
         Ok(())
     }
 
-    pub fn process_event(&mut self, event: Event) {
+    pub fn process_event(&mut self, event: Event) -> Result<()> {
         match event {
             event::Event::Key(key_event) => {
                 if key_event.kind == KeyEventKind::Press {
@@ -111,7 +111,14 @@ impl Editor {
                             self.buffer.move_left();
                             self.cap_scroll();
                         }
-                        _ => (),
+                        event::KeyCode::Enter => {
+                            self.buffer.add_line_at_cursor()?;
+                            self.cap_scroll();
+                        }
+                        keycode => {
+                            self.buffer
+                                .add_str_at_cursor(format!("{}", keycode).as_str())?;
+                        }
                     }
                 }
             }
@@ -141,6 +148,8 @@ impl Editor {
             },
             _ => (),
         };
+
+        Ok(())
     }
 
     pub fn display(&mut self, stdout: &mut Stdout) -> Result<()> {
