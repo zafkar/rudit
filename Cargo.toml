@@ -18,3 +18,4 @@ serde = { version = "1.0.217", features = ["derive"] }
 toml = "0.8.20"
 strum = { version = "0.26.3", features = ["derive"] }
 strum_macros = "0.26.3"
+home = "0.5.11"

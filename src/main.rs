@@ -27,6 +27,11 @@ fn main() -> Result<()> {
             let mut editor = Editor::new();
             if let Some(path) = matches.get_one::<String>("config") {
                 editor.set_config(path)?;
+            } else if let Some(home_path) = home::home_dir() {
+                let config_path = home_path.join(".config/rudit.toml");
+                if config_path.exists() {
+                    editor.set_config(config_path)?;
+                }
             }
 
             if let Some(path) = matches.get_one::<String>("FILE") {
