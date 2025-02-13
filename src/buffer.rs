@@ -82,6 +82,57 @@ impl Buffer {
         Ok(())
     }
 
+    pub fn delete_n_chars_back_from_cursor(&mut self, n: usize) -> Result<()> {
+        let mut deleted = 0;
+        let mut cursor = self.get_cursor();
+        while deleted < n {
+            if cursor == Pos::new(0, 0) {
+                break;
+            }
+
+            if cursor.x == 0 {
+                let current_line = self
+                    .data
+                    .get(cursor.y)
+                    .context("No line at cursor")?
+                    .clone();
+                let prev_line = self
+                    .data
+                    .get(cursor.y - 1)
+                    .context("No line before cursor")?
+                    .clone();
+                self.data.remove(cursor.y);
+                *(self
+                    .data
+                    .get_mut(cursor.y - 1)
+                    .context("No line at cursor")?) = prev_line.clone() + &current_line;
+                cursor = Pos::new(prev_line.len(), cursor.y - 1);
+                deleted += 1;
+                continue;
+            }
+
+            if cursor.x >= (n - deleted) {
+                let current_line = self.data.get(cursor.y).context("No line at cursor")?;
+                *(self.data.get_mut(cursor.y).context("No line at cursor")?) = current_line
+                    .get(0..cursor.x + deleted - n)
+                    .context("Couldn't extract start slice")?
+                    .to_string()
+                    + current_line
+                        .get(cursor.x..current_line.len())
+                        .context("Couldn't extract end slice")?;
+                cursor.x -= n - deleted;
+                deleted += n - deleted;
+            } else {
+                *(self.data.get_mut(cursor.y).context("No line at cursor")?) = String::new();
+                deleted += cursor.x;
+                cursor = Pos::new(0, cursor.y);
+            }
+        }
+
+        self.cursor = cursor;
+        Ok(())
+    }
+
     pub fn add_line_at_cursor(&mut self) -> Result<()> {
         let cursor = self.get_cursor();
         if let Some(current_line) = self.data.get(cursor.y).map(|x| x.clone()) {

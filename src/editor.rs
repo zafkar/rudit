@@ -25,6 +25,7 @@ pub struct Editor {
     config: Config,
     filename: Option<PathBuf>,
     last_keypress: String,
+    need_full_clear: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -45,6 +46,7 @@ impl Editor {
             config: Config::default(),
             filename: None,
             last_keypress: String::new(),
+            need_full_clear: false,
         }
     }
 
@@ -105,6 +107,8 @@ impl Editor {
             event::EnableBracketedPaste,
             event::EnableFocusChange,
             event::EnableMouseCapture,
+            style::SetForegroundColor(self.config.fg_color_ui.into()),
+            style::SetBackgroundColor(self.config.bg_color_ui.into()),
             terminal::Clear(terminal::ClearType::All),
             cursor::EnableBlinking,
             cursor::MoveTo(0, 0),
@@ -163,6 +167,11 @@ impl Editor {
                                     self.buffer.save_to_file(path)?;
                                 }
                             }
+                            EditorAction::DeleteCharBack => {
+                                self.buffer.delete_n_chars_back_from_cursor(1)?;
+                                self.need_full_clear = true;
+                                self.cap_scroll();
+                            }
                         },
                         None => match key_event.code {
                             event::KeyCode::Enter => {
@@ -213,6 +222,10 @@ impl Editor {
     pub fn display(&mut self, stdout: &mut Stdout) -> Result<()> {
         if self.state == EditorState::Init {
             self.init(stdout)?;
+        }
+
+        if self.need_full_clear {
+            queue!(stdout, terminal::Clear(terminal::ClearType::All))?;
         }
 
         let viewport_pos = self.buffer.get_viewport_pos(self.scroll);
@@ -270,4 +283,5 @@ pub enum EditorAction {
     PageUp,
     PageDown,
     SaveDocument,
+    DeleteCharBack,
 }
