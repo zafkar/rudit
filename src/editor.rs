@@ -105,6 +105,14 @@ impl Editor {
                             self.buffer.move_down();
                             self.cap_scroll();
                         }
+                        event::KeyCode::Right => {
+                            self.buffer.move_right();
+                            self.cap_scroll();
+                        }
+                        event::KeyCode::Left => {
+                            self.buffer.move_left();
+                            self.cap_scroll();
+                        }
                         _ => (),
                     }
                 }
@@ -131,7 +139,7 @@ impl Editor {
 
         for (index, line) in self
             .buffer
-            .get_viewport(self.scroll.x, self.scroll.y, self.size.x, self.size.y - 1)
+            .get_viewport(self.scroll, self.size)
             .iter()
             .enumerate()
         {

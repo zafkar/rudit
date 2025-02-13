@@ -26,15 +26,9 @@ impl Buffer {
         )
     }
 
-    pub fn get_viewport(
-        &self,
-        origin_x: usize,
-        origin_y: usize,
-        width: usize,
-        height: usize,
-    ) -> Vec<String> {
+    pub fn get_viewport(&self, scroll: Pos, size: Pos) -> Vec<String> {
         let mut viewport = vec![];
-        for y in origin_y..origin_y + height {
+        for y in scroll.y..scroll.y + size.y {
             if let Some(line) = self.data.get(y) {
                 viewport.push(line.to_string());
             }
