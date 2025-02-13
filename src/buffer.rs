@@ -71,10 +71,11 @@ impl Buffer {
 
     pub fn add_str_at_cursor(&mut self, text: &str) -> Result<()> {
         let cursor = self.get_cursor();
-        self.data
-            .get_mut(cursor.y)
-            .context("No line at cursor")?
-            .insert_str(cursor.x, text);
+        if let Some(line) = self.data.get_mut(cursor.y) {
+            line.insert_str(cursor.x, text);
+        } else {
+            self.data.push(text.to_string());
+        }
         self.move_cursor(cursor.x + text.len(), cursor.y);
         Ok(())
     }

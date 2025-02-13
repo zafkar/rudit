@@ -133,6 +133,9 @@ impl Editor {
                             self.buffer.add_line_at_cursor()?;
                             self.cap_scroll();
                         }
+                        event::KeyCode::Char(c) => {
+                            self.buffer.add_str_at_cursor(format!("{}", c).as_str())?;
+                        }
                         keycode => {
                             self.buffer
                                 .add_str_at_cursor(format!("{}", keycode).as_str())?;
@@ -198,6 +201,7 @@ impl Editor {
             )?;
         }
 
+        // Displaying the UI
         queue!(
             stdout,
             cursor::MoveTo(0, self.window_size.y as u16 - 1),
