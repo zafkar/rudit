@@ -111,6 +111,24 @@ impl Editor {
                             self.buffer.move_left();
                             self.cap_scroll();
                         }
+                        event::KeyCode::PageUp => {
+                            self.buffer.move_cursor(
+                                self.buffer.get_cursor().x,
+                                self.buffer
+                                    .get_cursor()
+                                    .y
+                                    .checked_sub(self.viewport_size.y - 1)
+                                    .unwrap_or_default(),
+                            );
+                            self.cap_scroll();
+                        }
+                        event::KeyCode::PageDown => {
+                            self.buffer.move_cursor(
+                                self.buffer.get_cursor().x,
+                                self.buffer.get_cursor().y + self.viewport_size.y - 1,
+                            );
+                            self.cap_scroll();
+                        }
                         event::KeyCode::Enter => {
                             self.buffer.add_line_at_cursor()?;
                             self.cap_scroll();
