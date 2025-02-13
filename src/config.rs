@@ -17,9 +17,9 @@ impl Default for Config {
                 b: 0x86,
             },
             fg_color_buffer: Color::Rgb {
-                r: 0x00,
-                g: 0xd9,
-                b: 0x07,
+                r: 0xfb,
+                g: 0xf1,
+                b: 0xc7,
             },
             bg_color_ui: Color::Rgb {
                 r: 0x80,
@@ -27,9 +27,9 @@ impl Default for Config {
                 b: 0x61,
             },
             fg_color_ui: Color::Rgb {
-                r: 0x00,
-                g: 0xd9,
-                b: 0x07,
+                r: 0xfb,
+                g: 0xf1,
+                b: 0xc7,
             },
         }
     }

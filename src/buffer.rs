@@ -59,7 +59,7 @@ impl Buffer {
     }
 
     pub fn move_cursor(&mut self, x: usize, y: usize) -> Pos {
-        let y = self.data.len().min(y);
+        let y = y.min(self.data.len() - 1);
         let x = self.data.get(y).map(|l| l.len()).unwrap_or_default().min(x);
         self.cursor = Pos::new(x, y);
         self.cursor.clone()

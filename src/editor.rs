@@ -135,8 +135,7 @@ impl Editor {
                         );
                         self.cap_scroll();
                     }
-                    event::MouseButton::Right => todo!(),
-                    event::MouseButton::Middle => todo!(),
+                    _ => (),
                 },
                 _ => (),
             },
@@ -154,6 +153,8 @@ impl Editor {
             stdout,
             cursor::MoveTo(viewport_pos.x as u16, viewport_pos.y as u16),
             cursor::SavePosition,
+            style::SetForegroundColor(self.config.fg_color_buffer),
+            style::SetBackgroundColor(self.config.bg_color_buffer),
         )?;
 
         for (index, line) in self
@@ -181,8 +182,6 @@ impl Editor {
                 self.buffer.get_cursor(),
                 self.scroll
             )),
-            style::SetForegroundColor(self.config.fg_color_buffer),
-            style::SetBackgroundColor(self.config.bg_color_buffer),
         )?;
 
         queue!(stdout, cursor::RestorePosition)?;
