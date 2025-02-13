@@ -1,18 +1,11 @@
 use anyhow::{bail, Result};
 use clap::{arg, command, Command};
-use config::Config;
 use crossterm::{
     event::{self},
     terminal,
 };
-use editor::Editor;
+use rudit::{config::Config, editor::Editor};
 use std::io::stdout;
-
-mod buffer;
-mod color;
-mod config;
-mod editor;
-mod pos;
 
 fn main() -> Result<()> {
     let matches = command!()
