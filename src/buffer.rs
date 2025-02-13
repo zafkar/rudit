@@ -38,33 +38,91 @@ impl Buffer {
         viewport
     }
 
-    pub fn move_up(&mut self) -> Pos {
+    pub fn move_up(&mut self) {
         self.move_cursor(
             self.cursor.x,
             self.cursor.y.checked_sub(1).unwrap_or(self.cursor.y),
         )
     }
 
-    pub fn move_down(&mut self) -> Pos {
+    pub fn move_down(&mut self) {
         self.move_cursor(self.cursor.x, self.cursor.y + 1)
     }
 
-    pub fn move_left(&mut self) -> Pos {
-        self.move_cursor(
-            self.cursor.x.checked_sub(1).unwrap_or(self.cursor.x),
-            self.cursor.y,
-        )
+    pub fn move_left_n(&mut self, n: usize) {
+        let mut moved = 0;
+        let mut cursor = self.cursor;
+        while moved < n {
+            if cursor == Pos::new(0, 0) {
+                break;
+            }
+            if cursor.x == 0 {
+                let prev_line_len = self
+                    .data
+                    .get(cursor.y - 1)
+                    .map(|l| l.len())
+                    .unwrap_or_default();
+                cursor = Pos::new(prev_line_len, cursor.y - 1);
+                moved += 1;
+                continue;
+            }
+            if cursor.x >= (n - moved) {
+                cursor.x -= n - moved;
+                moved += n - moved;
+            } else {
+                moved += cursor.x;
+                cursor = Pos::new(0, cursor.y);
+            }
+        }
+
+        self.cursor = cursor;
     }
 
-    pub fn move_right(&mut self) -> Pos {
-        self.move_cursor(self.cursor.x + 1, self.cursor.y)
+    pub fn move_right_n(&mut self, n: usize) {
+        let mut moved = 0;
+        let mut cursor = self.cursor;
+        let last_cursor_y_pos = self.data.len().checked_sub(1).unwrap_or_default();
+        let file_end_pos = Pos::new(
+            self.data
+                .get(last_cursor_y_pos)
+                .map(|l| l.len())
+                .unwrap_or_default(),
+            last_cursor_y_pos,
+        );
+        while moved < n {
+            if cursor == file_end_pos {
+                break;
+            }
+            let current_line_len = self.data.get(cursor.y).map(|l| l.len()).unwrap();
+            if cursor.x == current_line_len {
+                cursor = Pos::new(0, cursor.y + 1);
+                moved += 1;
+                continue;
+            }
+            if (current_line_len - cursor.x) >= (n - moved) {
+                cursor.x += n - moved;
+                moved += n - moved;
+            } else {
+                moved += cursor.x;
+                cursor = Pos::new(current_line_len, cursor.y);
+            }
+        }
+
+        self.cursor = cursor;
     }
 
-    pub fn move_cursor(&mut self, x: usize, y: usize) -> Pos {
+    pub fn move_left(&mut self) {
+        self.move_left_n(1)
+    }
+
+    pub fn move_right(&mut self) {
+        self.move_right_n(1)
+    }
+
+    pub fn move_cursor(&mut self, x: usize, y: usize) {
         let y = y.min(self.data.len().checked_sub(1).unwrap_or_default());
         let x = self.data.get(y).map(|l| l.len()).unwrap_or_default().min(x);
         self.cursor = Pos::new(x, y);
-        self.cursor.clone()
     }
 
     pub fn get_cursor(&self) -> Pos {
