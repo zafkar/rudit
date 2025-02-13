@@ -1,9 +1,11 @@
 [package]
 name = "rudit"
+description = "A simple rust editor"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 anyhow = "1.0.95"
+clap = { version = "4.5.29", features = ["cargo"] }
 crossterm = "0.28.1"
 itertools = "0.14.0"

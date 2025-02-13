@@ -1,5 +1,6 @@
 use anyhow::Result;
 use buffer::Buffer;
+use clap::{arg, command};
 use crossterm::{
     event::{self},
     execute,
@@ -15,11 +16,18 @@ mod editor;
 mod pos;
 
 fn main() -> Result<()> {
+    let matches = command!()
+        .args([arg!([FILE] "The file to edit")])
+        .get_matches();
+
     let mut stdout = stdout();
     terminal::enable_raw_mode()?;
 
     let mut editor = Editor::new();
-    editor = editor.set_buffer(Buffer::load_from_file("src/main.rs")?);
+    if let Some(path) = matches.get_one::<String>("FILE") {
+        editor = editor.set_buffer(Buffer::load_from_file(path)?);
+    }
+
     {
         let (width, height) = terminal::size()?;
         editor.set_size(width, height);

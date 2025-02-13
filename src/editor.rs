@@ -32,7 +32,7 @@ impl Editor {
             scroll: Pos::default(),
             window_size: Pos::default(),
             viewport_size: Pos::default(),
-            buffer: Buffer::default(),
+            buffer: Buffer::new(),
             state: EditorState::Init,
             config: Config::default(),
         }
