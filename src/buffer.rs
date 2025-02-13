@@ -49,7 +49,7 @@ impl Buffer {
         self.move_cursor(self.cursor.x, self.cursor.y + 1)
     }
 
-    pub fn move_left_n(&mut self, n: usize) {
+    pub fn move_left_n(&mut self, n: usize) -> usize {
         let mut moved = 0;
         let mut cursor = self.cursor;
         while moved < n {
@@ -76,9 +76,10 @@ impl Buffer {
         }
 
         self.cursor = cursor;
+        moved
     }
 
-    pub fn move_right_n(&mut self, n: usize) {
+    pub fn move_right_n(&mut self, n: usize) -> usize {
         let mut moved = 0;
         let mut cursor = self.cursor;
         let last_cursor_y_pos = self.data.len().checked_sub(1).unwrap_or_default();
@@ -109,13 +110,14 @@ impl Buffer {
         }
 
         self.cursor = cursor;
+        moved
     }
 
-    pub fn move_left(&mut self) {
+    pub fn move_left(&mut self) -> usize {
         self.move_left_n(1)
     }
 
-    pub fn move_right(&mut self) {
+    pub fn move_right(&mut self) -> usize {
         self.move_right_n(1)
     }
 
@@ -138,6 +140,11 @@ impl Buffer {
         }
         self.move_cursor(cursor.x + text.len(), cursor.y);
         Ok(())
+    }
+
+    pub fn delete_n_chars_front_from_cursor(&mut self, n: usize) -> Result<()> {
+        let moved = self.move_right_n(n);
+        self.delete_n_chars_back_from_cursor(moved)
     }
 
     pub fn delete_n_chars_back_from_cursor(&mut self, n: usize) -> Result<()> {

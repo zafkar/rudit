@@ -176,6 +176,11 @@ impl Editor {
                                 self.need_full_clear = true;
                                 self.cap_scroll();
                             }
+                            EditorAction::DeleteCharFront => {
+                                self.buffer.delete_n_chars_front_from_cursor(1)?;
+                                self.need_full_clear = true;
+                                self.cap_scroll();
+                            }
                         },
                         None => match key_event.code {
                             event::KeyCode::Enter => {
@@ -288,4 +293,5 @@ pub enum EditorAction {
     PageDown,
     SaveDocument,
     DeleteCharBack,
+    DeleteCharFront,
 }

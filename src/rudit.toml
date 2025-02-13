@@ -16,3 +16,4 @@ use_paste = false
 "Page Up" = "PageUp"
 "Ctrls" = "SaveDocument"
 "Backspace" = "DeleteCharBack"
+"Del" = "DeleteCharFront"
