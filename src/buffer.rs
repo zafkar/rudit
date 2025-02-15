@@ -10,7 +10,7 @@ pub struct Buffer {
     data: Vec<String>,
     cursor: Pos,
     //pub is debug
-    pub scroll: Pos,
+    scroll: Pos,
     viewport_size: Pos,
     endl: String,
     top_left_corner: Pos,

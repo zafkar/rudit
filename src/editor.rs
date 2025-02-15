@@ -409,7 +409,6 @@ impl Editor {
             style::Print(format!(
                 "Cursor : {}, Scroll : {}, Last Key Press : ({}), ESize : {}, CSize : {}",
                 self.edit_buffer.get_cursor(),
-                self.edit_buffer.scroll,
                 self.last_keypress,
                 self.edit_buffer.get_viewport_size(),
                 self.command_buffer.get_viewport_size()
