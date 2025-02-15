@@ -238,6 +238,12 @@ impl Editor {
                                         .unwrap_or_default(),
                                 );
                             }
+                            EditorAction::MoveLineEnd => {
+                                self.command_buffer.move_line_end();
+                            }
+                            EditorAction::MoveLineStart => {
+                                self.command_buffer.move_start_line();
+                            }
                             EditorAction::DeleteCharBack => {
                                 self.command_buffer.delete_n_chars_back_from_cursor(1)?;
                                 self.need_full_clear = true;
@@ -342,13 +348,19 @@ impl Editor {
                                         .unwrap_or_default(),
                                 );
                             }
+                            EditorAction::MoveLineEnd => {
+                                self.edit_buffer.move_line_end();
+                            }
+                            EditorAction::MoveLineStart => {
+                                self.edit_buffer.move_start_line();
+                            }
                             EditorAction::SaveDocument => {
                                 if let Some(path) = self.filename.clone() {
                                     self.edit_buffer.save_to_file(path)?;
                                 } else {
                                     self.command_buffer = Buffer::load_from_str("save_as ");
-                                    self.command_buffer.move_line_end();
                                     self.set_state(EditorState::CommandMode);
+                                    self.command_buffer.move_line_end();
                                 }
                             }
                             EditorAction::DeleteCharBack => {
@@ -478,6 +490,8 @@ pub enum EditorAction {
     MoveLeft,
     PageUp,
     PageDown,
+    MoveLineStart,
+    MoveLineEnd,
     SaveDocument,
     DeleteCharBack,
     DeleteCharFront,
