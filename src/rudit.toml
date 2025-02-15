@@ -1,10 +1,18 @@
-bg_color_buffer = "#b16286"
-fg_color_buffer = "#fbf1c7"
-bg_color_ui = "#804761"
-fg_color_ui = "#fbf1c7"
 
 use_mouse = true
 use_paste = false
+
+[color_edit_zone]
+bg = "#b16286"
+fg = "#fbf1c7"
+
+[color_status_bar]
+bg = "#804761"
+fg = "#fbf1c7"
+
+[color_command_zone]
+bg = "#9f62b1"
+fg = "#fbf1c7"
 
 [keybindings]
 "Esc" = "Quit"

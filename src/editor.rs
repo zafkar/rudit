@@ -150,15 +150,14 @@ impl Editor {
         if self.config.use_paste {
             queue!(stdout, event::EnableBracketedPaste,)?;
         }
+
         queue!(
             stdout,
-            style::SetForegroundColor(self.config.fg_color_ui.into()),
-            style::SetBackgroundColor(self.config.bg_color_ui.into()),
+            style::SetColors(self.config.color_status_bar.into()),
             terminal::Clear(terminal::ClearType::All),
             cursor::EnableBlinking,
             cursor::MoveTo(0, 0),
-            style::SetForegroundColor(self.config.fg_color_buffer.into()),
-            style::SetBackgroundColor(self.config.bg_color_buffer.into()),
+            style::SetColors(self.config.color_edit_zone.into()),
         )?;
 
         self.set_state(EditorState::EditMode);
@@ -380,13 +379,7 @@ impl Editor {
             queue!(stdout, terminal::Clear(terminal::ClearType::All))?;
         }
 
-        let viewport_pos = self.edit_buffer.get_viewport_pos();
-        queue!(
-            stdout,
-            cursor::MoveTo(viewport_pos.x as u16, viewport_pos.y as u16),
-            style::SetForegroundColor(self.config.fg_color_buffer.into()),
-            style::SetBackgroundColor(self.config.bg_color_buffer.into()),
-        )?;
+        queue!(stdout, style::SetColors(self.config.color_edit_zone.into()),)?;
 
         for (pos, line) in self.edit_buffer.get_viewport().iter() {
             queue!(
@@ -396,6 +389,11 @@ impl Editor {
                 style::Print(format!("{line}"))
             )?;
         }
+
+        queue!(
+            stdout,
+            style::SetColors(self.config.color_command_zone.into()),
+        )?;
 
         for (pos, line) in self.command_buffer.get_viewport().iter() {
             queue!(
@@ -410,8 +408,7 @@ impl Editor {
         queue!(
             stdout,
             cursor::MoveTo(0, self.window_size.y as u16 - 1),
-            style::SetForegroundColor(self.config.fg_color_ui.into()),
-            style::SetBackgroundColor(self.config.bg_color_ui.into()),
+            style::SetColors(self.config.color_status_bar.into()),
             terminal::Clear(terminal::ClearType::CurrentLine),
             style::Print(format!(
                 "Cursor : {}, Scroll : {}, Last Key Press : ({}), ESize : {}, CSize : {}",
