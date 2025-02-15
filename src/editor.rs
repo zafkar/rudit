@@ -17,37 +17,41 @@ use crate::{buffer::Buffer, config::Config, pos::Pos};
 
 #[derive(Debug, Clone)]
 pub struct Editor {
-    scroll: Pos,
     window_size: Pos,
-    viewport_size: Pos,
-    buffer: Buffer,
+    edit_buffer: Buffer,
     state: EditorState,
     config: Config,
     filename: Option<PathBuf>,
     last_keypress: String,
     need_full_clear: bool,
+    command_buffer: Buffer,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum EditorState {
     Init,
-    Normal,
+    EditMode,
+    CommandMode,
     Close,
 }
 
 impl Editor {
     pub fn new() -> Editor {
         Editor {
-            scroll: Pos::default(),
             window_size: Pos::default(),
-            viewport_size: Pos::default(),
-            buffer: Buffer::new(),
+            edit_buffer: Buffer::new(),
             state: EditorState::Init,
             config: Config::default(),
             filename: None,
             last_keypress: String::new(),
             need_full_clear: false,
+            command_buffer: Buffer::new(),
         }
+    }
+
+    fn set_state(&mut self, state: EditorState) {
+        self.state = state;
+        self.update_layout(self.window_size);
     }
 
     pub fn is_done(&self) -> bool {
@@ -68,7 +72,7 @@ impl Editor {
         P: AsRef<Path> + Clone,
         PathBuf: From<P>,
     {
-        self.buffer = match Buffer::load_from_file(path.clone()) {
+        self.edit_buffer = match Buffer::load_from_file(path.clone()) {
             Ok(buffer) => buffer,
             Err(_) => Buffer::new(),
         };
@@ -76,29 +80,52 @@ impl Editor {
         Ok(())
     }
 
-    pub fn set_size(&mut self, width: u16, height: u16) {
-        self.window_size.x = width as usize;
-        self.window_size.y = height as usize;
-        self.viewport_size.x = width as usize;
-        self.viewport_size.y = height as usize - 1;
-    }
+    pub fn update_layout(&mut self, window_size: Pos) {
+        self.window_size = window_size;
 
-    fn cap_scroll(&mut self) {
-        let x = if self.buffer.get_cursor().x < self.scroll.x {
-            self.buffer.get_cursor().x
-        } else if self.buffer.get_cursor().x > (self.scroll.x + self.viewport_size.x - 1) {
-            self.buffer.get_cursor().x - self.viewport_size.x + 1
-        } else {
-            self.scroll.x
+        //Update commandbuffer
+        let command_buffer_viewport_size: Pos = match self.state {
+            EditorState::EditMode => (window_size.x, 0).into(),
+            EditorState::CommandMode => (
+                window_size.x,
+                (window_size.y.checked_sub(1).unwrap_or_default())
+                    .min(self.command_buffer.content_lines_len() + 1),
+            )
+                .into(),
+            _ => self.command_buffer.get_viewport_size(),
         };
-        let y = if self.buffer.get_cursor().y < self.scroll.y {
-            self.buffer.get_cursor().y
-        } else if self.buffer.get_cursor().y > (self.scroll.y + self.viewport_size.y - 1) {
-            self.buffer.get_cursor().y - self.viewport_size.y + 1
-        } else {
-            self.scroll.y
-        };
-        self.scroll = Pos::new(x, y);
+        self.command_buffer
+            .set_viewport_size(command_buffer_viewport_size);
+
+        self.command_buffer.set_top_left_corner(
+            (
+                0,
+                window_size
+                    .y
+                    .checked_sub(1 + command_buffer_viewport_size.y)
+                    .unwrap_or_default(),
+            )
+                .into(),
+        );
+
+        //Update editbuffer
+        self.edit_buffer.set_viewport_size(match self.state {
+            EditorState::EditMode => (
+                window_size.x,
+                window_size.y.checked_sub(1).unwrap_or_default(),
+            )
+                .into(),
+            EditorState::CommandMode => (
+                window_size.x,
+                (window_size.y)
+                    .checked_sub(command_buffer_viewport_size.y + 1)
+                    .unwrap_or_default(),
+            )
+                .into(),
+            _ => self.edit_buffer.get_viewport_size(),
+        });
+
+        self.need_full_clear = true;
     }
 
     pub fn cleanup(stdout: &mut Stdout) -> Result<()> {
@@ -134,103 +161,205 @@ impl Editor {
             style::SetBackgroundColor(self.config.bg_color_buffer.into()),
         )?;
 
-        self.state = EditorState::Normal;
+        self.set_state(EditorState::EditMode);
         Ok(())
     }
 
     pub fn process_event(&mut self, event: Event) -> Result<()> {
+        match event {
+            event::Event::Resize(width, height) => {
+                self.update_layout((width, height).into());
+                Ok(())
+            }
+            event => match self.state {
+                EditorState::EditMode => self.process_event_edit_mode(event),
+                EditorState::CommandMode => self.process_event_command_mode(event),
+                _ => Ok(()),
+            },
+        }
+    }
+
+    fn process_event_command_mode(&mut self, event: Event) -> Result<()> {
         match event {
             event::Event::Key(key_event) => {
                 if key_event.kind == KeyEventKind::Press {
                     self.last_keypress = format!("{}{}", key_event.modifiers, key_event.code);
                     match self.config.keybindings.get(&self.last_keypress) {
                         Some(action) => match action {
-                            EditorAction::Quit => self.state = EditorState::Close,
+                            EditorAction::Quit => self.set_state(EditorState::Close),
                             EditorAction::MoveUp => {
-                                self.buffer.move_up();
-                                self.cap_scroll();
+                                self.command_buffer.move_up();
                             }
                             EditorAction::MoveDown => {
-                                self.buffer.move_down();
-                                self.cap_scroll();
+                                self.command_buffer.move_down();
                             }
                             EditorAction::MoveRight => {
-                                self.buffer.move_right();
-                                self.cap_scroll();
+                                self.command_buffer.move_right();
                             }
                             EditorAction::MoveLeft => {
-                                self.buffer.move_left();
-                                self.cap_scroll();
+                                self.command_buffer.move_left();
                             }
                             EditorAction::PageUp => {
-                                self.buffer.move_cursor(
-                                    self.buffer.get_cursor().x,
-                                    self.buffer
-                                        .get_cursor()
+                                self.command_buffer.move_up_n(
+                                    self.command_buffer
+                                        .get_viewport_size()
                                         .y
-                                        .checked_sub(self.viewport_size.y - 1)
+                                        .checked_sub(1)
                                         .unwrap_or_default(),
                                 );
-                                self.cap_scroll();
                             }
                             EditorAction::PageDown => {
-                                self.buffer.move_cursor(
-                                    self.buffer.get_cursor().x,
-                                    self.buffer.get_cursor().y + self.viewport_size.y - 1,
+                                self.command_buffer.move_down_n(
+                                    self.command_buffer
+                                        .get_viewport_size()
+                                        .y
+                                        .checked_sub(1)
+                                        .unwrap_or_default(),
                                 );
-                                self.cap_scroll();
                             }
                             EditorAction::SaveDocument => {
                                 if let Some(path) = self.filename.clone() {
-                                    self.buffer.save_to_file(path)?;
+                                    self.command_buffer.save_to_file(path)?;
                                 }
                             }
                             EditorAction::DeleteCharBack => {
-                                self.buffer.delete_n_chars_back_from_cursor(1)?;
+                                self.command_buffer.delete_n_chars_back_from_cursor(1)?;
                                 self.need_full_clear = true;
-                                self.cap_scroll();
                             }
                             EditorAction::DeleteCharFront => {
-                                self.buffer.delete_n_chars_front_from_cursor(1)?;
+                                self.command_buffer.delete_n_chars_front_from_cursor(1)?;
                                 self.need_full_clear = true;
-                                self.cap_scroll();
                             }
+                            EditorAction::GoIntoCommandMode => (),
+                            EditorAction::GoIntoEditMode => self.set_state(EditorState::EditMode),
                         },
                         None => match key_event.code {
                             event::KeyCode::Enter => {
-                                self.buffer.add_line_at_cursor()?;
-                                self.cap_scroll();
+                                self.command_buffer.add_line_at_cursor()?;
                             }
                             event::KeyCode::Char(c) => {
-                                self.buffer.add_str_at_cursor(format!("{}", c).as_str())?;
+                                self.command_buffer
+                                    .add_str_at_cursor(format!("{}", c).as_str())?;
                             }
                             keycode => {
-                                self.buffer
+                                self.command_buffer
                                     .add_str_at_cursor(format!("{}", keycode).as_str())?;
                             }
                         },
                     }
                 }
             }
-            event::Event::Resize(width, height) => {
-                self.set_size(width, height);
+            // event::Event::Mouse(mouse_event) => match mouse_event.kind {
+            //     event::MouseEventKind::ScrollDown => {
+            //         self.command_buffer.move_down();
+            //
+            //     }
+            //     event::MouseEventKind::ScrollUp => {
+            //         self.command_buffer.move_up();
+            //
+            //     }
+            //     event::MouseEventKind::Down(button) => match button {
+            //         event::MouseButton::Left => {
+            //             self.command_buffer.move_cursor(
+            //                 mouse_event.column as usize + self.scroll.x,
+            //                 mouse_event.row as usize + self.scroll.y,
+            //             );
+            //
+            //         }
+            //         _ => (),
+            //     },
+            //     _ => (),
+            // },
+            _ => (),
+        };
+
+        Ok(())
+    }
+
+    fn process_event_edit_mode(&mut self, event: Event) -> Result<()> {
+        match event {
+            event::Event::Key(key_event) => {
+                if key_event.kind == KeyEventKind::Press {
+                    self.last_keypress = format!("{}{}", key_event.modifiers, key_event.code);
+                    match self.config.keybindings.get(&self.last_keypress) {
+                        Some(action) => match action {
+                            EditorAction::Quit => self.set_state(EditorState::Close),
+                            EditorAction::MoveUp => {
+                                self.edit_buffer.move_up();
+                            }
+                            EditorAction::MoveDown => {
+                                self.edit_buffer.move_down();
+                            }
+                            EditorAction::MoveRight => {
+                                self.edit_buffer.move_right();
+                            }
+                            EditorAction::MoveLeft => {
+                                self.edit_buffer.move_left();
+                            }
+                            EditorAction::PageUp => {
+                                self.edit_buffer.move_up_n(
+                                    self.edit_buffer
+                                        .get_viewport_size()
+                                        .y
+                                        .checked_sub(1)
+                                        .unwrap_or_default(),
+                                );
+                            }
+                            EditorAction::PageDown => {
+                                self.edit_buffer.move_down_n(
+                                    self.edit_buffer
+                                        .get_viewport_size()
+                                        .y
+                                        .checked_sub(1)
+                                        .unwrap_or_default(),
+                                );
+                            }
+                            EditorAction::SaveDocument => {
+                                if let Some(path) = self.filename.clone() {
+                                    self.edit_buffer.save_to_file(path)?;
+                                }
+                            }
+                            EditorAction::DeleteCharBack => {
+                                self.edit_buffer.delete_n_chars_back_from_cursor(1)?;
+                                self.need_full_clear = true;
+                            }
+                            EditorAction::DeleteCharFront => {
+                                self.edit_buffer.delete_n_chars_front_from_cursor(1)?;
+                                self.need_full_clear = true;
+                            }
+                            EditorAction::GoIntoCommandMode => {
+                                self.set_state(EditorState::CommandMode)
+                            }
+                            EditorAction::GoIntoEditMode => (),
+                        },
+                        None => match key_event.code {
+                            event::KeyCode::Enter => {
+                                self.edit_buffer.add_line_at_cursor()?;
+                            }
+                            event::KeyCode::Char(c) => {
+                                self.edit_buffer
+                                    .add_str_at_cursor(format!("{}", c).as_str())?;
+                            }
+                            keycode => {
+                                self.edit_buffer
+                                    .add_str_at_cursor(format!("{}", keycode).as_str())?;
+                            }
+                        },
+                    }
+                }
             }
             event::Event::Mouse(mouse_event) => match mouse_event.kind {
                 event::MouseEventKind::ScrollDown => {
-                    self.buffer.move_down();
-                    self.cap_scroll();
+                    self.edit_buffer.move_down();
                 }
                 event::MouseEventKind::ScrollUp => {
-                    self.buffer.move_up();
-                    self.cap_scroll();
+                    self.edit_buffer.move_up();
                 }
                 event::MouseEventKind::Down(button) => match button {
                     event::MouseButton::Left => {
-                        self.buffer.move_cursor(
-                            mouse_event.column as usize + self.scroll.x,
-                            mouse_event.row as usize + self.scroll.y,
+                        self.edit_buffer.move_cursor_relative(
+                            (mouse_event.column as usize, mouse_event.row as usize).into(),
                         );
-                        self.cap_scroll();
                     }
                     _ => (),
                 },
@@ -251,24 +380,27 @@ impl Editor {
             queue!(stdout, terminal::Clear(terminal::ClearType::All))?;
         }
 
-        let viewport_pos = self.buffer.get_viewport_pos(self.scroll);
+        let viewport_pos = self.edit_buffer.get_viewport_pos();
         queue!(
             stdout,
             cursor::MoveTo(viewport_pos.x as u16, viewport_pos.y as u16),
-            cursor::SavePosition,
             style::SetForegroundColor(self.config.fg_color_buffer.into()),
             style::SetBackgroundColor(self.config.bg_color_buffer.into()),
         )?;
 
-        for (index, line) in self
-            .buffer
-            .get_viewport(self.scroll, self.viewport_size)
-            .iter()
-            .enumerate()
-        {
+        for (pos, line) in self.edit_buffer.get_viewport().iter() {
             queue!(
                 stdout,
-                cursor::MoveTo(0, index as u16),
+                cursor::MoveTo::from(*pos),
+                terminal::Clear(terminal::ClearType::CurrentLine),
+                style::Print(format!("{line}"))
+            )?;
+        }
+
+        for (pos, line) in self.command_buffer.get_viewport().iter() {
+            queue!(
+                stdout,
+                cursor::MoveTo::from(*pos),
                 terminal::Clear(terminal::ClearType::CurrentLine),
                 style::Print(format!("{line}"))
             )?;
@@ -282,14 +414,21 @@ impl Editor {
             style::SetBackgroundColor(self.config.bg_color_ui.into()),
             terminal::Clear(terminal::ClearType::CurrentLine),
             style::Print(format!(
-                "Cursor : {}, Scroll : {}, Last Key Press : ({})",
-                self.buffer.get_cursor(),
-                self.scroll,
-                self.last_keypress
+                "Cursor : {}, Scroll : {}, Last Key Press : ({}), ESize : {}, CSize : {}",
+                self.edit_buffer.get_cursor(),
+                self.edit_buffer.scroll,
+                self.last_keypress,
+                self.edit_buffer.get_viewport_size(),
+                self.command_buffer.get_viewport_size()
             )),
         )?;
 
-        queue!(stdout, cursor::RestorePosition)?;
+        let terminal_cursor_pos = match self.state {
+            EditorState::EditMode => self.edit_buffer.get_viewport_pos(),
+            EditorState::CommandMode => self.command_buffer.get_viewport_pos(),
+            _ => (0usize, 0).into(),
+        };
+        queue!(stdout, cursor::MoveTo::from(terminal_cursor_pos))?;
 
         stdout.flush()?;
         Ok(())
@@ -308,4 +447,6 @@ pub enum EditorAction {
     SaveDocument,
     DeleteCharBack,
     DeleteCharFront,
+    GoIntoCommandMode,
+    GoIntoEditMode,
 }

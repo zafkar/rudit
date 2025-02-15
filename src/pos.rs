@@ -1,7 +1,9 @@
 use std::{
     fmt::Display,
-    ops::{Add, AddAssign},
+    ops::{Add, AddAssign, Sub, SubAssign},
 };
+
+use crossterm::cursor;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Pos {
@@ -39,6 +41,23 @@ impl AddAssign for Pos {
     }
 }
 
+impl Sub for Pos {
+    type Output = Pos;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Pos {
+            x: self.x.checked_sub(rhs.x).unwrap_or_default(),
+            y: self.y.checked_sub(rhs.y).unwrap_or_default(),
+        }
+    }
+}
+
+impl SubAssign for Pos {
+    fn sub_assign(&mut self, rhs: Self) {
+        *self = *self - rhs
+    }
+}
+
 impl Add<(usize, usize)> for Pos {
     type Output = Pos;
 
@@ -56,5 +75,23 @@ impl AddAssign<(usize, usize)> for Pos {
 impl From<(usize, usize)> for Pos {
     fn from(value: (usize, usize)) -> Self {
         Pos::new(value.0, value.1)
+    }
+}
+
+impl From<Pos> for (u16, u16) {
+    fn from(value: Pos) -> Self {
+        (value.x as u16, value.y as u16)
+    }
+}
+
+impl From<Pos> for cursor::MoveTo {
+    fn from(value: Pos) -> Self {
+        let (x, y) = value.into();
+        cursor::MoveTo(x, y)
+    }
+}
+impl From<(u16, u16)> for Pos {
+    fn from(value: (u16, u16)) -> Self {
+        Pos::new(value.0 as usize, value.1 as usize)
     }
 }

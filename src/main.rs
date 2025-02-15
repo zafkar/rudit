@@ -39,8 +39,7 @@ fn main() -> Result<()> {
             }
 
             {
-                let (width, height) = terminal::size()?;
-                editor.set_size(width, height);
+                editor.update_layout(terminal::size()?.into());
             }
 
             let mut stdout = stdout();

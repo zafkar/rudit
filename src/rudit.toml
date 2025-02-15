@@ -17,3 +17,5 @@ use_paste = false
 "Ctrls" = "SaveDocument"
 "Backspace" = "DeleteCharBack"
 "Del" = "DeleteCharFront"
+"Ctrle" = "GoIntoEditMode"
+"Ctrlc" = "GoIntoCommandMode"

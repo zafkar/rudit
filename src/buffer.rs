@@ -9,7 +9,11 @@ use crate::pos::Pos;
 pub struct Buffer {
     data: Vec<String>,
     cursor: Pos,
+    //pub is debug
+    pub scroll: Pos,
+    viewport_size: Pos,
     endl: String,
+    top_left_corner: Pos,
 }
 
 impl Buffer {
@@ -18,35 +22,92 @@ impl Buffer {
             data: vec![],
             cursor: Pos::default(),
             endl: String::from("\n"),
+            scroll: Pos::new(0, 0),
+            viewport_size: Pos::new(0, 0),
+            top_left_corner: Pos::new(0, 0),
         }
     }
 
-    pub fn get_viewport_pos(&self, scroll: Pos) -> Pos {
-        Pos::new(
-            self.cursor.x.checked_sub(scroll.x).unwrap_or_default(),
-            self.cursor.y.checked_sub(scroll.y).unwrap_or_default(),
-        )
+    pub fn set_top_left_corner(&mut self, pos: Pos) {
+        self.top_left_corner = pos
     }
 
-    pub fn get_viewport(&self, scroll: Pos, size: Pos) -> Vec<String> {
+    pub fn content_lines_len(&self) -> usize {
+        self.data.len()
+    }
+
+    pub fn get_viewport_size(&self) -> Pos {
+        self.viewport_size
+    }
+
+    pub fn set_viewport_size(&mut self, size: Pos) {
+        self.viewport_size = size
+    }
+
+    pub fn get_viewport_pos(&self) -> Pos {
+        self.cursor - self.scroll + self.top_left_corner
+    }
+
+    pub fn get_viewport(&self) -> Vec<(Pos, String)> {
         let mut viewport = vec![];
-        for y in scroll.y..scroll.y + size.y {
+        for y in self.scroll.y..self.scroll.y + self.viewport_size.y {
             if let Some(line) = self.data.get(y) {
-                viewport.push(line.to_string());
+                viewport.push((
+                    self.top_left_corner + (0, y) - self.scroll,
+                    line.to_string(),
+                ));
             }
         }
         viewport
     }
 
+    fn cap_scroll(&mut self) {
+        let x = if self.get_cursor().x < self.scroll.x {
+            self.get_cursor().x
+        } else if self.get_cursor().x > (self.scroll.x + self.viewport_size.x - 1) {
+            self.get_cursor().x - self.viewport_size.x + 1
+        } else {
+            self.scroll.x
+        };
+        let y = if self.get_cursor().y < self.scroll.y {
+            self.get_cursor().y
+        } else if self.get_cursor().y
+            > (self.scroll.y + self.viewport_size.y.checked_sub(1).unwrap_or_default())
+        {
+            self.get_cursor().y - self.viewport_size.y + 1
+        } else {
+            self.scroll.y
+        };
+        self.scroll = Pos::new(x, y);
+    }
+
+    //Todo: change to be base fn
+    pub fn move_up_n(&mut self, n: usize) {
+        for _ in 0..n {
+            self.move_up();
+        }
+    }
+
+    //Todo: change to be base fn
+    pub fn move_down_n(&mut self, n: usize) {
+        for _ in 0..n {
+            self.move_down();
+        }
+    }
+
     pub fn move_up(&mut self) {
-        self.move_cursor(
+        let pos = Pos::new(
             self.cursor.x,
             self.cursor.y.checked_sub(1).unwrap_or(self.cursor.y),
-        )
+        );
+        self.move_cursor(pos);
+        self.cap_scroll();
     }
 
     pub fn move_down(&mut self) {
-        self.move_cursor(self.cursor.x, self.cursor.y + 1)
+        let pos = Pos::new(self.cursor.x, self.cursor.y + 1);
+        self.move_cursor(pos);
+        self.cap_scroll();
     }
 
     pub fn move_left_n(&mut self, n: usize) -> usize {
@@ -76,6 +137,7 @@ impl Buffer {
         }
 
         self.cursor = cursor;
+        self.cap_scroll();
         moved
     }
 
@@ -110,6 +172,7 @@ impl Buffer {
         }
 
         self.cursor = cursor;
+        self.cap_scroll();
         moved
     }
 
@@ -121,10 +184,22 @@ impl Buffer {
         self.move_right_n(1)
     }
 
-    pub fn move_cursor(&mut self, x: usize, y: usize) {
-        let y = y.min(self.data.len().checked_sub(1).unwrap_or_default());
-        let x = self.data.get(y).map(|l| l.len()).unwrap_or_default().min(x);
+    pub fn move_cursor(&mut self, pos: Pos) {
+        let y = pos
+            .y
+            .min(self.data.len().checked_sub(1).unwrap_or_default());
+        let x = self
+            .data
+            .get(y)
+            .map(|l| l.len())
+            .unwrap_or_default()
+            .min(pos.x);
         self.cursor = Pos::new(x, y);
+        self.cap_scroll();
+    }
+
+    pub fn move_cursor_relative(&mut self, pos: Pos) {
+        self.cursor = self.cursor + pos
     }
 
     pub fn get_cursor(&self) -> Pos {
@@ -138,7 +213,8 @@ impl Buffer {
         } else {
             self.data.push(text.to_string());
         }
-        self.move_cursor(cursor.x + text.len(), cursor.y);
+        self.move_cursor(cursor + (text.len(), 0));
+        self.cap_scroll();
         Ok(())
     }
 
@@ -195,6 +271,7 @@ impl Buffer {
         }
 
         self.cursor = cursor;
+        self.cap_scroll();
         Ok(())
     }
 
@@ -215,8 +292,15 @@ impl Buffer {
         } else {
             self.data.push(String::new());
         }
-        self.move_cursor(0, cursor.y + 1);
+        self.move_cursor((0, cursor.y + 1).into());
+        self.cap_scroll();
         Ok(())
+    }
+
+    pub fn load_from_str(s: &str) -> Buffer {
+        let mut loaded_buffer = Buffer::new();
+        loaded_buffer.data = s.lines().map(|l| l.to_string()).collect_vec();
+        loaded_buffer
     }
 
     pub fn load_from_file<P>(path: P) -> Result<Buffer>
