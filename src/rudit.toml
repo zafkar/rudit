@@ -27,6 +27,9 @@ fg = "#fbf1c7"
 "Del" = "DeleteCharFront"
 "Ctrlp" = "GoIntoCommandMode"
 
+[edit_keybindings.Ctrlf.Command]
+SetFilename = "output.txt"
+
 [command_keybindings]
 "Up" = "MoveUp"
 "Down" = "MoveDown"
@@ -37,3 +40,4 @@ fg = "#fbf1c7"
 "Backspace" = "DeleteCharBack"
 "Del" = "DeleteCharFront"
 "Esc" = "GoIntoEditMode"
+"Ctrle" = "DeleteAll"

@@ -1,17 +1,16 @@
-use std::{
-    fs,
-    io::{Stdout, Write},
-    path::{Path, PathBuf},
-};
-
-use anyhow::Result;
+use anyhow::{anyhow, Context, Result};
 use crossterm::{
     cursor,
     event::{self, Event, KeyEventKind},
     queue, style, terminal,
 };
 use serde::{Deserialize, Serialize};
-use strum::EnumString;
+use std::{
+    fs,
+    io::{Stdout, Write},
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 use crate::{buffer::Buffer, config::Config, pos::Pos};
 
@@ -89,7 +88,7 @@ impl Editor {
             EditorState::CommandMode => (
                 window_size.x,
                 (window_size.y.checked_sub(1).unwrap_or_default())
-                    .min(self.command_buffer.content_lines_len() + 1),
+                    .min(self.command_buffer.content_lines_len()),
             )
                 .into(),
             _ => self.command_buffer.get_viewport_size(),
@@ -164,6 +163,24 @@ impl Editor {
         Ok(())
     }
 
+    fn execute_command(&mut self, command: &EditorCommand) -> Result<()> {
+        match command {
+            EditorCommand::SetFilename(filename) => {
+                self.filename = if filename.is_empty() {
+                    None
+                } else {
+                    Some(PathBuf::from(filename))
+                }
+            }
+            EditorCommand::SaveAs(filename) => {
+                self.filename = Some(PathBuf::from(filename));
+                self.edit_buffer
+                    .save_to_file(self.filename.clone().unwrap())?;
+            }
+        }
+        Ok(())
+    }
+
     pub fn process_event(&mut self, event: Event) -> Result<()> {
         match event {
             event::Event::Resize(width, height) => {
@@ -183,7 +200,12 @@ impl Editor {
             event::Event::Key(key_event) => {
                 if key_event.kind == KeyEventKind::Press {
                     self.last_keypress = format!("{}{}", key_event.modifiers, key_event.code);
-                    match self.config.command_keybindings.get(&self.last_keypress) {
+                    match self
+                        .config
+                        .command_keybindings
+                        .clone()
+                        .get(&self.last_keypress)
+                    {
                         Some(action) => match action {
                             EditorAction::Quit => self.set_state(EditorState::Close),
                             EditorAction::MoveUp => {
@@ -225,12 +247,18 @@ impl Editor {
                                 self.need_full_clear = true;
                             }
                             EditorAction::GoIntoEditMode => self.set_state(EditorState::EditMode),
+                            EditorAction::DeleteAll => self.command_buffer.empty_content(),
+                            EditorAction::Command(cmd) => self.execute_command(cmd)?,
                             EditorAction::GoIntoCommandMode => (),
                             EditorAction::SaveDocument => (),
                         },
                         None => match key_event.code {
                             event::KeyCode::Enter => {
-                                self.command_buffer.add_line_at_cursor()?;
+                                self.execute_command(&EditorCommand::from_str(
+                                    &self.command_buffer.get_contents(),
+                                )?)?;
+                                self.command_buffer.empty_content();
+                                self.set_state(EditorState::EditMode);
                             }
                             event::KeyCode::Char(c) => {
                                 self.command_buffer
@@ -276,7 +304,12 @@ impl Editor {
             event::Event::Key(key_event) => {
                 if key_event.kind == KeyEventKind::Press {
                     self.last_keypress = format!("{}{}", key_event.modifiers, key_event.code);
-                    match self.config.edit_keybindings.get(&self.last_keypress) {
+                    match self
+                        .config
+                        .edit_keybindings
+                        .clone()
+                        .get(&self.last_keypress)
+                    {
                         Some(action) => match action {
                             EditorAction::Quit => self.set_state(EditorState::Close),
                             EditorAction::MoveUp => {
@@ -312,6 +345,10 @@ impl Editor {
                             EditorAction::SaveDocument => {
                                 if let Some(path) = self.filename.clone() {
                                     self.edit_buffer.save_to_file(path)?;
+                                } else {
+                                    self.command_buffer = Buffer::load_from_str("save_as ");
+                                    self.command_buffer.move_line_end();
+                                    self.set_state(EditorState::CommandMode);
                                 }
                             }
                             EditorAction::DeleteCharBack => {
@@ -325,6 +362,8 @@ impl Editor {
                             EditorAction::GoIntoCommandMode => {
                                 self.set_state(EditorState::CommandMode)
                             }
+                            EditorAction::DeleteAll => self.edit_buffer.empty_content(),
+                            EditorAction::Command(cmd) => self.execute_command(cmd)?,
                             EditorAction::GoIntoEditMode => (),
                         },
                         None => match key_event.code {
@@ -372,10 +411,14 @@ impl Editor {
         }
 
         if self.need_full_clear {
-            queue!(stdout, terminal::Clear(terminal::ClearType::All))?;
+            queue!(
+                stdout,
+                style::SetColors(self.config.color_status_bar.into()),
+                terminal::Clear(terminal::ClearType::All)
+            )?;
         }
 
-        queue!(stdout, style::SetColors(self.config.color_edit_zone.into()),)?;
+        queue!(stdout, style::SetColors(self.config.color_edit_zone.into()))?;
 
         for (pos, line) in self.edit_buffer.get_viewport().iter() {
             queue!(
@@ -407,11 +450,10 @@ impl Editor {
             style::SetColors(self.config.color_status_bar.into()),
             terminal::Clear(terminal::ClearType::CurrentLine),
             style::Print(format!(
-                "Cursor : {}, Scroll : {}, Last Key Press : ({}), ESize : {}, CSize : {}",
+                "Filename : {:?}, Cursor : {}, Last Key Press : ({})",
+                self.filename,
                 self.edit_buffer.get_cursor(),
                 self.last_keypress,
-                self.edit_buffer.get_viewport_size(),
-                self.command_buffer.get_viewport_size()
             )),
         )?;
 
@@ -427,7 +469,7 @@ impl Editor {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumString, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum EditorAction {
     Quit,
     MoveUp,
@@ -439,6 +481,31 @@ pub enum EditorAction {
     SaveDocument,
     DeleteCharBack,
     DeleteCharFront,
+    DeleteAll,
     GoIntoCommandMode,
     GoIntoEditMode,
+    Command(EditorCommand),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub enum EditorCommand {
+    SetFilename(String),
+    SaveAs(String),
+}
+
+impl FromStr for EditorCommand {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let cmd = comma::parse_command(s).context("Unknown escape seq")?;
+        match cmd.get(0).context("No command")?.as_str() {
+            "set_filename" => Ok(EditorCommand::SetFilename(
+                cmd.get(1).unwrap_or(&"".to_string()).clone(),
+            )),
+            "save_as" => Ok(EditorCommand::SaveAs(
+                cmd.get(1).context("No filename")?.to_string(),
+            )),
+            _ => Err(anyhow!("Unknown command")),
+        }
+    }
 }

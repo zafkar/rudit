@@ -19,7 +19,7 @@ pub struct Buffer {
 impl Buffer {
     pub fn new() -> Buffer {
         Buffer {
-            data: vec![],
+            data: vec![String::new()],
             cursor: Pos::default(),
             endl: String::from("\n"),
             scroll: Pos::new(0, 0),
@@ -64,7 +64,9 @@ impl Buffer {
     fn cap_scroll(&mut self) {
         let x = if self.get_cursor().x < self.scroll.x {
             self.get_cursor().x
-        } else if self.get_cursor().x > (self.scroll.x + self.viewport_size.x - 1) {
+        } else if self.get_cursor().x
+            > (self.scroll.x + self.viewport_size.x.checked_sub(1).unwrap_or_default())
+        {
             self.get_cursor().x - self.viewport_size.x + 1
         } else {
             self.scroll.x
@@ -184,6 +186,23 @@ impl Buffer {
         self.move_right_n(1)
     }
 
+    pub fn move_line_end(&mut self) -> usize {
+        let mut cursor = self.get_cursor();
+        let current_line_len = self.data.get(cursor.y).map(|l| l.len()).unwrap_or_default();
+        let moved = current_line_len - cursor.x;
+        cursor.x = current_line_len;
+        self.cursor = cursor;
+        self.cap_scroll();
+        moved
+    }
+
+    pub fn move_start_line(&mut self) -> usize {
+        let moved = self.get_cursor().x;
+        self.cursor.x = 0;
+        self.cap_scroll();
+        moved
+    }
+
     pub fn move_cursor(&mut self, pos: Pos) {
         let y = pos
             .y
@@ -297,10 +316,21 @@ impl Buffer {
         Ok(())
     }
 
+    pub fn empty_content(&mut self) {
+        self.data = vec![String::new()];
+    }
+
     pub fn load_from_str(s: &str) -> Buffer {
         let mut loaded_buffer = Buffer::new();
         loaded_buffer.data = s.lines().map(|l| l.to_string()).collect_vec();
         loaded_buffer
+    }
+
+    pub fn get_contents(&self) -> String {
+        self.data
+            .iter()
+            .map(|line| (line.to_string() + &self.endl))
+            .join("")
     }
 
     pub fn load_from_file<P>(path: P) -> Result<Buffer>
@@ -319,14 +349,7 @@ impl Buffer {
     where
         P: AsRef<Path>,
     {
-        fs::write(
-            path,
-            self.data
-                .iter()
-                .map(|line| (line.to_string() + &self.endl))
-                .join("")
-                .as_bytes(),
-        )?;
+        fs::write(path, self.get_contents().as_bytes())?;
         Ok(())
     }
 }
