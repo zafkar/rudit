@@ -8,7 +8,8 @@ pub struct Config {
     pub color_edit_zone: ColorPair,
     pub color_status_bar: ColorPair,
     pub color_command_zone: ColorPair,
-    pub keybindings: HashMap<String, EditorAction>,
+    pub edit_keybindings: HashMap<String, EditorAction>,
+    pub command_keybindings: HashMap<String, EditorAction>,
     pub use_mouse: bool,
     pub use_paste: bool,
 }
@@ -23,12 +24,6 @@ pub struct ColorPair {
     fg: Color,
 }
 
-impl From<ColorPair> for style::Colors {
-    fn from(value: ColorPair) -> Self {
-        style::Colors::new(value.fg.into(), value.bg.into())
-    }
-}
-
 fn deserialize_color_from_str<'de, D>(deserializer: D) -> Result<Color, D::Error>
 where
     D: Deserializer<'de>,
@@ -41,6 +36,12 @@ where
     S: Serializer,
 {
     s.serialize_str(&format!("{x}"))
+}
+
+impl From<ColorPair> for style::Colors {
+    fn from(value: ColorPair) -> Self {
+        style::Colors::new(value.fg.into(), value.bg.into())
+    }
 }
 
 impl Default for Config {

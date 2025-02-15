@@ -14,7 +14,7 @@ fg = "#fbf1c7"
 bg = "#9f62b1"
 fg = "#fbf1c7"
 
-[keybindings]
+[edit_keybindings]
 "Esc" = "Quit"
 "Up" = "MoveUp"
 "Down" = "MoveDown"
@@ -25,5 +25,15 @@ fg = "#fbf1c7"
 "Ctrls" = "SaveDocument"
 "Backspace" = "DeleteCharBack"
 "Del" = "DeleteCharFront"
-"Ctrle" = "GoIntoEditMode"
-"Ctrlc" = "GoIntoCommandMode"
+"Ctrlp" = "GoIntoCommandMode"
+
+[command_keybindings]
+"Up" = "MoveUp"
+"Down" = "MoveDown"
+"Left" = "MoveLeft"
+"Right" = "MoveRight"
+"Page Down" = "PageDown"
+"Page Up" = "PageUp"
+"Backspace" = "DeleteCharBack"
+"Del" = "DeleteCharFront"
+"Esc" = "GoIntoEditMode"

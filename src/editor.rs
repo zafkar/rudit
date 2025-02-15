@@ -183,7 +183,7 @@ impl Editor {
             event::Event::Key(key_event) => {
                 if key_event.kind == KeyEventKind::Press {
                     self.last_keypress = format!("{}{}", key_event.modifiers, key_event.code);
-                    match self.config.keybindings.get(&self.last_keypress) {
+                    match self.config.command_keybindings.get(&self.last_keypress) {
                         Some(action) => match action {
                             EditorAction::Quit => self.set_state(EditorState::Close),
                             EditorAction::MoveUp => {
@@ -216,11 +216,6 @@ impl Editor {
                                         .unwrap_or_default(),
                                 );
                             }
-                            EditorAction::SaveDocument => {
-                                if let Some(path) = self.filename.clone() {
-                                    self.command_buffer.save_to_file(path)?;
-                                }
-                            }
                             EditorAction::DeleteCharBack => {
                                 self.command_buffer.delete_n_chars_back_from_cursor(1)?;
                                 self.need_full_clear = true;
@@ -229,8 +224,9 @@ impl Editor {
                                 self.command_buffer.delete_n_chars_front_from_cursor(1)?;
                                 self.need_full_clear = true;
                             }
-                            EditorAction::GoIntoCommandMode => (),
                             EditorAction::GoIntoEditMode => self.set_state(EditorState::EditMode),
+                            EditorAction::GoIntoCommandMode => (),
+                            EditorAction::SaveDocument => (),
                         },
                         None => match key_event.code {
                             event::KeyCode::Enter => {
@@ -280,7 +276,7 @@ impl Editor {
             event::Event::Key(key_event) => {
                 if key_event.kind == KeyEventKind::Press {
                     self.last_keypress = format!("{}{}", key_event.modifiers, key_event.code);
-                    match self.config.keybindings.get(&self.last_keypress) {
+                    match self.config.edit_keybindings.get(&self.last_keypress) {
                         Some(action) => match action {
                             EditorAction::Quit => self.set_state(EditorState::Close),
                             EditorAction::MoveUp => {
